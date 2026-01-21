@@ -5,7 +5,51 @@ app = Flask(__name__)
 
 jobs = {}
 approvals = []
+@app.route("/chat/message", methods=["POST"])
+def chat_message():
+    """
+    Simple 'chat' endpoint for UI:
+    - takes a natural language message
+    - creates a mock GENERATE_VIDEO job
+    - returns job_id and suggested next actions
+    """
+    body = request.json or {}
+    message = (body.get("message") or "").strip()
+    project_id = body.get("project_id", "proj_001")
+    platform = body.get("platform", "youtube")
+    duration_sec = int(body.get("duration_sec", 8))
 
+    if not message:
+        return jsonify({"ok": False, "error": "MESSAGE_REQUIRED"}), 400
+
+    job_id = f"job_{uuid.uuid4().hex[:8]}"
+    jobs[job_id] = {
+        "job_id": job_id,
+        "status": "QUEUED",
+        "created_at": time.time(),
+        "type": "GENERATE_VIDEO",
+        "project_id": project_id,
+        "payload": {
+            "prompt": message,
+            "platform": platform,
+            "duration_sec": duration_sec
+        }
+    }
+
+    return jsonify({
+        "ok": True,
+        "reply": "✅ Job created. Check status, then send result to approvals.",
+        "job": {
+            "job_id": job_id,
+            "status": "QUEUED",
+            "platform": platform,
+            "duration_sec": duration_sec
+        },
+        "next": [
+            {"action": "CHECK_JOB", "method": "GET", "url": f"/jobs/{job_id}"},
+            {"action": "CREATE_APPROVAL", "method": "POST", "url": "/approvals/create"}
+        ]
+    })
 @app.route("/health")
 def health():
     return {"ok": True, "name": "Butler API"}
